@@ -1,37 +1,22 @@
-import { useState } from 'react'
 import { Copy } from 'lucide-react'
 import { queryHistory } from '../../data/mockData'
+import { ResultsTable } from './ResultsTable'
+import type { SqlView } from './SqlResultsToolbar'
 
-export function SqlResultsTab() {
-  const [sub, setSub] = useState<'results' | 'history'>('history')
+export type PreviewState = { model: string; key: number }
 
+export function SqlResultsTab({
+  view,
+  preview,
+  onOpenInEditor,
+}: {
+  view: SqlView
+  preview: PreviewState | null
+  onOpenInEditor?: (model: string) => void
+}) {
   return (
     <div className="flex h-full flex-col">
-      {/* sub tabs */}
-      <div className="flex items-center gap-4 border-b border-border px-3">
-        <button
-          onClick={() => setSub('results')}
-          className={`border-b-2 py-1.5 text-[12px] ${
-            sub === 'results'
-              ? 'border-accent text-text-bright'
-              : 'border-transparent text-text-muted hover:text-text'
-          }`}
-        >
-          Results
-        </button>
-        <button
-          onClick={() => setSub('history')}
-          className={`border-b-2 py-1.5 text-[12px] ${
-            sub === 'history'
-              ? 'border-accent text-text-bright'
-              : 'border-transparent text-text-muted hover:text-text'
-          }`}
-        >
-          Query History
-        </button>
-      </div>
-
-      {sub === 'history' ? (
+      {view === 'history' ? (
         <div className="flex-1 overflow-y-auto">
           {queryHistory.map((row, i) => (
             <div
@@ -55,9 +40,11 @@ export function SqlResultsTab() {
             </div>
           ))}
         </div>
+      ) : preview ? (
+        <ResultsTable model={preview.model} onOpenInEditor={() => onOpenInEditor?.(preview.model)} />
       ) : (
         <div className="flex flex-1 items-center justify-center text-[13px] text-text-muted">
-          Run a query to see results
+          Run a query or preview a model to see results
         </div>
       )}
     </div>

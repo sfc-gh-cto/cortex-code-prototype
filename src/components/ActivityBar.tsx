@@ -47,7 +47,7 @@ export function ActivityBar({
   onSelect: (v: SidebarView) => void
 }) {
   return (
-    <div className="flex w-12 shrink-0 flex-col items-center justify-between bg-chrome-bg py-1">
+    <div className="flex w-12 shrink-0 flex-col items-center justify-between border-r border-border bg-chrome-bg py-1">
       <div className="flex flex-col items-center">
         {topItems.map(({ id, icon: Icon, badge, switchable }) => {
           const isActive = switchable && id === active
