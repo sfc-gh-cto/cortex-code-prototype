@@ -60,7 +60,7 @@ export function Shell() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [bottomOpen, setBottomOpen] = useState(true)
   const [bottomMaximized, setBottomMaximized] = useState(false)
-  const [sessionOpen, setSessionOpen] = useState(true)
+  const [sessionOpen, setSessionOpen] = useState(false)
 
   function toggleBottom() {
     setBottomOpen((o) => {
