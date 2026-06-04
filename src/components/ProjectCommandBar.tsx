@@ -2,6 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronUp, Play, Square, Snowflake, SlidersHorizontal, Laptop, Check } from 'lucide-react'
 import { CommandBuilder } from './CommandBuilder'
+import {
+  ManagedCommandBar,
+  ManagedRunButton,
+  managedDbtCommand,
+  DEFAULT_MANAGED,
+  type ManagedConfig,
+} from './ManagedCommandBar'
 import { EXECUTION_MODES, type RunMode } from '../data/settings'
 import { dbtProjectRoots } from '../data/files'
 import { DbtLogo } from './ui/DbtLogo'
@@ -53,11 +60,12 @@ function ProjectSelector({
         ref={anchorRef}
         onClick={() => setOpen((o) => !o)}
         title="Active dbt project"
-        className="flex h-6 shrink-0 items-center gap-1.5 rounded border border-border-strong bg-input-bg px-2 text-[12px] text-text hover:border-text-muted"
+        style={{ maxWidth: 140 }}
+        className="flex h-6 min-w-0 items-center gap-1.5 rounded border border-border-strong bg-input-bg px-2 text-[12px] text-text hover:border-text-muted"
       >
         <DbtLogo size={13} />
-        <span className="max-w-44 truncate">{value}</span>
-        <ChevronUp size={12} className="text-text-muted" />
+        <span className="truncate">{value}</span>
+        <ChevronUp size={12} className="shrink-0 text-text-muted" />
       </button>
 
       {open &&
@@ -106,7 +114,7 @@ function RunModeControl({
   const ctaRef = useRef<HTMLButtonElement>(null)
   const [hover, setHover] = useState(false)
   const [pos, setPos] = useState<{ bottom: number; left: number } | null>(null)
-  const POP_W = 300
+  const POP_W = mode === 'local' ? 300 : 220
 
   useLayoutEffect(() => {
     if (!hover || !ctaRef.current) return
@@ -167,14 +175,35 @@ function RunModeControl({
   }
 
   return (
-    <button
-      onClick={onOpenSettings}
-      title="dbt execution settings"
-      className="flex h-6 shrink-0 items-center gap-1.5 rounded border border-border-strong bg-chrome-bg px-2 text-[11px] text-text hover:border-text-muted"
-    >
-      <Snowflake size={12} className="text-[#29b5e8]" />
-      <span>Snowflake Managed</span>
-    </button>
+    <>
+      <button
+        ref={ctaRef}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        onClick={onOpenSettings}
+        className="flex h-6 shrink-0 items-center justify-center rounded border border-border-strong bg-chrome-bg px-1.5 text-text hover:border-text-muted"
+      >
+        <Snowflake size={13} className="text-[#29b5e8]" />
+      </button>
+
+      {hover &&
+        pos &&
+        createPortal(
+          <div
+            style={{ position: 'fixed', bottom: pos.bottom, left: pos.left, width: POP_W }}
+            className="pointer-events-none z-[2000] rounded-md border border-[#454545] bg-[#252526] p-2.5 text-[12px] shadow-2xl"
+          >
+            <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-text">
+              <Snowflake size={12} className="text-[#29b5e8]" />
+              Snowflake Managed
+            </div>
+            <p className="mt-1 text-text-muted">
+              dbt runs in Snowflake — no local install to maintain. Click to open execution settings.
+            </p>
+          </div>,
+          document.body,
+        )}
+    </>
   )
 }
 
@@ -193,7 +222,7 @@ export function ProjectCommandBar({
   command: string
   onCommandChange: (value: string) => void
   running: boolean
-  onRun: () => void
+  onRun: (text: string) => void
   onStop: () => void
   onOpenSettings: () => void
   runMode: RunMode
@@ -206,6 +235,12 @@ export function ProjectCommandBar({
   const [chipOpen, setChipOpen] = useState(false)
   const [chipPos, setChipPos] = useState<{ bottom: number; left: number } | null>(null)
 
+  // Snowflake Managed structured command state (operation + flags + run context).
+  const [managedConfig, setManagedConfig] = useState<ManagedConfig>(DEFAULT_MANAGED)
+
+  const managed = runMode === 'snowflake'
+  const commandToRun = managed ? managedDbtCommand(managedConfig) : command
+
   useLayoutEffect(() => {
     if (!chipOpen || !inputRef.current) return
     const r = inputRef.current.getBoundingClientRect()
@@ -216,27 +251,31 @@ export function ProjectCommandBar({
     <div className="flex h-9 shrink-0 items-center gap-2 border-y border-border bg-chrome-bg px-2">
       <ProjectSelector projects={dbtProjectRoots} value={project} onChange={setProject} />
 
-      {/* dbt command input */}
-      <div
-        ref={inputRef}
-        className="flex h-6 min-w-0 flex-1 items-center gap-1.5 rounded border border-border-strong bg-input-bg px-2 focus-within:border-accent"
-      >
-        <span className="shrink-0 font-mono text-text-muted">$</span>
-        <input
-          value={command}
-          onChange={(e) => {
-            onCommandChange(e.target.value)
-            setChipOpen(false) // typing dismisses the chip
-          }}
-          onFocus={() => !builderOpen && setChipOpen(true)}
-          onBlur={() => setChipOpen(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !running) onRun()
-          }}
-          placeholder="Enter command (e.g., dbt run, dbt test, dbt compile)"
-          className="min-w-0 flex-1 bg-transparent text-[12px] text-text outline-none placeholder:text-text-dim"
-        />
-      </div>
+      {managed ? (
+        <ManagedCommandBar project={project} value={managedConfig} onChange={setManagedConfig} />
+      ) : (
+        /* Local mode: free-text dbt command input */
+        <div
+          ref={inputRef}
+          className="flex h-6 min-w-0 flex-1 items-center gap-1.5 rounded border border-border-strong bg-input-bg px-2 focus-within:border-accent"
+        >
+          <span className="shrink-0 font-mono text-text-muted">$</span>
+          <input
+            value={command}
+            onChange={(e) => {
+              onCommandChange(e.target.value)
+              setChipOpen(false) // typing dismisses the chip
+            }}
+            onFocus={() => !builderOpen && setChipOpen(true)}
+            onBlur={() => setChipOpen(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !running) onRun(command)
+            }}
+            placeholder="Enter command (e.g., dbt run, dbt test, dbt compile)"
+            className="min-w-0 flex-1 bg-transparent text-[12px] text-text outline-none placeholder:text-text-dim"
+          />
+        </div>
+      )}
 
       {running ? (
         <button
@@ -246,9 +285,15 @@ export function ProjectCommandBar({
           <Square size={11} className="fill-current" />
           Stop
         </button>
+      ) : managed ? (
+        <ManagedRunButton
+          operation={managedConfig.operation}
+          onOperationChange={(op) => setManagedConfig({ ...managedConfig, operation: op })}
+          onRun={() => onRun(commandToRun)}
+        />
       ) : (
         <button
-          onClick={onRun}
+          onClick={() => onRun(commandToRun)}
           title="Run"
           className="flex h-6 shrink-0 items-center rounded bg-accent px-3 text-[12px] font-medium text-white hover:bg-accent-hover"
         >
@@ -256,8 +301,8 @@ export function ProjectCommandBar({
         </button>
       )}
 
-      {/* Focus chip: a lightweight entry point into the full builder */}
-      {chipOpen &&
+      {/* Local-mode helpers: focus chip + full command builder */}
+      {!managed && chipOpen &&
         !builderOpen &&
         chipPos &&
         createPortal(
@@ -277,12 +322,14 @@ export function ProjectCommandBar({
           document.body,
         )}
 
-      <CommandBuilder
-        anchorRef={inputRef}
-        open={builderOpen}
-        onClose={() => setBuilderOpen(false)}
-        onChange={onCommandChange}
-      />
+      {!managed && (
+        <CommandBuilder
+          anchorRef={inputRef}
+          open={builderOpen}
+          onClose={() => setBuilderOpen(false)}
+          onChange={onCommandChange}
+        />
+      )}
 
       <RunModeControl mode={runMode} onChange={onRunModeChange} onOpenSettings={onOpenSettings} />
     </div>

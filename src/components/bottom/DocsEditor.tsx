@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Box, Sparkles, Loader2, Save, Check } from 'lucide-react'
-import { lineageByProject, type LineageNode } from '../../data/mockData'
+import { lineageByProject, fileToLineage, type LineageNode } from '../../data/mockData'
 import { materialization, modelColumns, modelDescription, columnDescription } from '../../data/docs'
 
 function IndexGroup({
@@ -219,6 +219,21 @@ function ModelDocForm({ node }: { node: LineageNode }) {
       </div>
     </div>
   )
+}
+
+// Single-model docs surface for the editor split pane. Resolves the model file
+// to its lineage node and renders the editable, AI-assisted form.
+export function ModelDocsPane({ model }: { model: string }) {
+  const ref = fileToLineage[model]
+  const node = ref ? lineageByProject[ref.project]?.nodes.find((n) => n.id === ref.nodeId) : undefined
+  if (!node) {
+    return (
+      <div className="flex flex-1 items-center justify-center text-[13px] text-text-dim">
+        No docs available for this model.
+      </div>
+    )
+  }
+  return <ModelDocForm key={model} node={node} />
 }
 
 export function DocsEditor({
