@@ -16,7 +16,8 @@ function TreeRow({
 }) {
   const [open, setOpen] = useState(!!node.defaultOpen)
   const isFolder = node.type === 'folder'
-  const isSelected = selected === node.name
+  const nodeId = node.id ?? node.name
+  const isSelected = selected === nodeId
   const indent = 8 + depth * 12
 
   return (
@@ -24,7 +25,7 @@ function TreeRow({
       <div
         onClick={() => {
           if (isFolder) setOpen((o) => !o)
-          else onSelect(node.name)
+          else onSelect(nodeId)
         }}
         style={{ paddingLeft: indent }}
         className={`group flex h-[22px] cursor-pointer items-center gap-1 pr-2 text-[13px] ${
@@ -47,12 +48,11 @@ function TreeRow({
         ) : (
           <FileIcon kind={node.kind} />
         )}
-        <span className={`truncate ${node.modified ? 'text-modified' : ''}`}>{node.name}</span>
-        {node.modified && <span className="ml-auto text-[11px] text-modified">M</span>}
+        <span className="truncate">{node.name}</span>
       </div>
       {isFolder && open && node.children?.map((child) => (
         <TreeRow
-          key={child.name}
+          key={child.id ?? child.name}
           node={child}
           depth={depth + 1}
           selected={selected}
@@ -91,7 +91,7 @@ export function FileTree({
   return (
     <div className="py-0.5">
       {nodes.map((node) => (
-        <TreeRow key={node.name} node={node} depth={0} selected={selected} onSelect={onSelect} />
+        <TreeRow key={node.id ?? node.name} node={node} depth={0} selected={selected} onSelect={onSelect} />
       ))}
     </div>
   )

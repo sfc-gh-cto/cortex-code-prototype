@@ -1,12 +1,12 @@
 import {
   ChevronDown,
   RefreshCw,
-  Search,
   PanelLeft,
   PanelBottom,
   PanelRight,
   LayoutGrid,
 } from 'lucide-react'
+import { CommandPalette } from './CommandPalette'
 
 function TrafficLights() {
   return (
@@ -35,6 +35,7 @@ export function TitleBar({
   onToggleSidebar,
   onToggleBottom,
   onToggleSession,
+  onOpenFile,
 }: {
   sidebarOpen: boolean
   bottomOpen: boolean
@@ -42,6 +43,7 @@ export function TitleBar({
   onToggleSidebar: () => void
   onToggleBottom: () => void
   onToggleSession: () => void
+  onOpenFile: (name: string) => void
 }) {
   return (
     <div className="flex h-9 shrink-0 items-center justify-between bg-chrome-bg px-3 text-xs select-none">
@@ -61,10 +63,7 @@ export function TitleBar({
 
       {/* center command bar */}
       <div className="flex flex-1 justify-center">
-        <div className="flex h-6 w-[460px] max-w-[50%] items-center justify-center gap-2 rounded-md border border-border-strong bg-app-bg/60 px-3 text-text-muted">
-          <Search size={11} />
-          <span className="truncate text-[12px] text-text">getting-started-with-dbt-on-snowflake</span>
-        </div>
+        <CommandPalette label="getting-started-with-dbt-on-snowflake" onOpenFile={onOpenFile} />
       </div>
 
       {/* right cluster */}

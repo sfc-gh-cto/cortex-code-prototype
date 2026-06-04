@@ -8,6 +8,74 @@ export type FileNode = {
   modified?: boolean
   children?: FileNode[]
   defaultOpen?: boolean
+  // optional stable identity (defaults to name). Used when two files share a base
+  // name — e.g. a model and its compiled artifact under target/.
+  id?: string
+}
+
+const PROJECT = 'tasty_bytes_dbt_demo'
+
+// dbt writes resolved SQL/Python to target/compiled/<project>/models/... .
+// These mirror the model files but carry full-path ids so they're distinct.
+const compiledModel = (sub: string, name: string, kind: FileNode['kind']): FileNode => ({
+  name,
+  type: 'file',
+  kind,
+  id: `${PROJECT}/target/compiled/${PROJECT}/models/${sub}/${name}`,
+})
+
+const targetFolder: FileNode = {
+  name: 'target',
+  type: 'folder',
+  kind: 'folder',
+  children: [
+    {
+      name: 'compiled',
+      type: 'folder',
+      kind: 'folder',
+      children: [
+        {
+          name: PROJECT,
+          type: 'folder',
+          kind: 'folder',
+          children: [
+            {
+              name: 'models',
+              type: 'folder',
+              kind: 'folder',
+              children: [
+                {
+                  name: 'marts',
+                  type: 'folder',
+                  kind: 'folder',
+                  children: [
+                    compiledModel('marts', 'customer_loyalty_metrics.sql', 'sql'),
+                    compiledModel('marts', 'orders.sql', 'sql'),
+                    compiledModel('marts', 'sales_metrics_by_location.py', 'python'),
+                  ],
+                },
+                {
+                  name: 'staging',
+                  type: 'folder',
+                  kind: 'folder',
+                  children: [
+                    compiledModel('staging', 'raw_customer_customer_loyalty.sql', 'sql'),
+                    compiledModel('staging', 'raw_pos_country.sql', 'sql'),
+                    compiledModel('staging', 'raw_pos_franchise.sql', 'sql'),
+                    compiledModel('staging', 'raw_pos_location.sql', 'sql'),
+                    compiledModel('staging', 'raw_pos_menu.sql', 'sql'),
+                    compiledModel('staging', 'raw_pos_order_detail.sql', 'sql'),
+                    compiledModel('staging', 'raw_pos_order_header.sql', 'sql'),
+                    compiledModel('staging', 'raw_pos_truck.sql', 'sql'),
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
 }
 
 export const fileTree: FileNode[] = [
@@ -56,6 +124,7 @@ export const fileTree: FileNode[] = [
         ],
       },
       { name: 'setup', type: 'folder', kind: 'folder' },
+      targetFolder,
       { name: 'tests', type: 'folder', kind: 'folder' },
       { name: 'dbt_project.yml', type: 'file', kind: 'yaml' },
       { name: 'packages.yml', type: 'file', kind: 'yaml' },
@@ -69,7 +138,60 @@ export const fileTree: FileNode[] = [
   },
 ]
 
-export const rootFolderName = 'GETTING-STARTED-WITH-DBT-ON-SNOWFLAKE'
+// ── Second dbt project (jaffle_shop) — files carry full-path ids so base names
+// like dbt_project.yml / orders.sql don't collide with the first project. ──
+const jf = (id: string, name: string, kind: FileNode['kind']): FileNode => ({
+  id,
+  name,
+  type: 'file',
+  kind,
+})
+
+const jaffleShop: FileNode = {
+  name: 'jaffle_shop',
+  type: 'folder',
+  kind: 'folder',
+  children: [
+    {
+      name: 'models',
+      type: 'folder',
+      kind: 'folder',
+      defaultOpen: true,
+      children: [
+        {
+          name: 'staging',
+          type: 'folder',
+          kind: 'folder',
+          defaultOpen: true,
+          children: [
+            jf('jaffle_shop/models/staging/stg_customers.sql', 'stg_customers.sql', 'sql'),
+            jf('jaffle_shop/models/staging/stg_orders.sql', 'stg_orders.sql', 'sql'),
+            jf('jaffle_shop/models/staging/stg_payments.sql', 'stg_payments.sql', 'sql'),
+          ],
+        },
+        {
+          name: 'marts',
+          type: 'folder',
+          kind: 'folder',
+          defaultOpen: true,
+          children: [
+            jf('jaffle_shop/models/marts/customers.sql', 'customers.sql', 'sql'),
+            jf('jaffle_shop/models/marts/orders.sql', 'orders.sql', 'sql'),
+          ],
+        },
+      ],
+    },
+    { name: 'seeds', type: 'folder', kind: 'folder' },
+    jf('jaffle_shop/dbt_project.yml', 'dbt_project.yml', 'yaml'),
+    jf('jaffle_shop/packages.yml', 'packages.yml', 'yaml'),
+    jf('jaffle_shop/profiles.yml', 'profiles.yml', 'yaml'),
+    jf('jaffle_shop/README.md', 'README.md', 'md'),
+  ],
+}
+
+fileTree.push(jaffleShop)
+
+export const rootFolderName = 'SNOWFLAKE-DBT-WORKSPACE'
 
 // ─── Editor: open tabs + settings.json content ───
 
@@ -106,6 +228,8 @@ export const tokenColors = {
   bool: 'var(--color-syntax-bool)',
   punct: 'var(--color-syntax-punct)',
   comment: 'var(--color-syntax-comment)',
+  number: 'var(--color-syntax-number)',
+  text: 'var(--color-syntax-text)',
 } as const
 
 export const settingsLines: Token[][] = [
@@ -329,6 +453,82 @@ export const lineageEdges: LineageEdge[] = [
   { from: 'raw_pos_location', to: 'sales_metrics_by_location' },
   { from: 'raw_pos_country', to: 'sales_metrics_by_location' },
 ]
+
+// ── jaffle_shop lineage (sources → staging → marts) ──
+const jaffleLineageNodes: LineageNode[] = [
+  { id: 'jf_src_customers', name: 'CUSTOMERS', type: 'source', col: 0, row: 0 },
+  { id: 'jf_src_orders', name: 'ORDERS', type: 'source', col: 0, row: 1 },
+  { id: 'jf_src_payments', name: 'PAYMENTS', type: 'source', col: 0, row: 2 },
+
+  { id: 'stg_customers', name: 'stg_customers', type: 'model', language: 'sql', col: 1, row: 0 },
+  { id: 'stg_orders', name: 'stg_orders', type: 'model', language: 'sql', col: 1, row: 1 },
+  { id: 'stg_payments', name: 'stg_payments', type: 'model', language: 'sql', col: 1, row: 2 },
+
+  { id: 'jf_customers', name: 'customers', type: 'model', language: 'sql', col: 2, row: 0 },
+  { id: 'jf_orders', name: 'orders', type: 'model', language: 'sql', col: 2, row: 2 },
+]
+
+const jaffleLineageEdges: LineageEdge[] = [
+  { from: 'jf_src_customers', to: 'stg_customers' },
+  { from: 'jf_src_orders', to: 'stg_orders' },
+  { from: 'jf_src_payments', to: 'stg_payments' },
+
+  { from: 'stg_customers', to: 'jf_customers' },
+  { from: 'stg_orders', to: 'jf_customers' },
+
+  { from: 'stg_orders', to: 'jf_orders' },
+  { from: 'stg_payments', to: 'jf_orders' },
+]
+
+export type LineageGraphData = {
+  nodes: LineageNode[]
+  edges: LineageEdge[]
+  // node id selected by default when the graph first renders
+  defaultSelected: string
+}
+
+// Lineage DAG per dbt project. The Lineage tab has its own project selector.
+export const lineageByProject: Record<string, LineageGraphData> = {
+  tasty_bytes_dbt_demo: {
+    nodes: lineageNodes,
+    edges: lineageEdges,
+    defaultSelected: 'customer_loyalty_metrics',
+  },
+  jaffle_shop: {
+    nodes: jaffleLineageNodes,
+    edges: jaffleLineageEdges,
+    defaultSelected: 'jf_customers',
+  },
+}
+
+// jaffle node ids don't match their file base names, so map them explicitly.
+const jaffleNodeFiles: Record<string, string> = {
+  stg_customers: 'jaffle_shop/models/staging/stg_customers.sql',
+  stg_orders: 'jaffle_shop/models/staging/stg_orders.sql',
+  stg_payments: 'jaffle_shop/models/staging/stg_payments.sql',
+  jf_customers: 'jaffle_shop/models/marts/customers.sql',
+  jf_orders: 'jaffle_shop/models/marts/orders.sql',
+}
+
+// Resolve a lineage model node to the editor file string it represents.
+function fileForNode(project: string, n: LineageNode): string | null {
+  if (n.type !== 'model') return null
+  if (project === 'jaffle_shop') return jaffleNodeFiles[n.id] ?? null
+  // tasty_bytes models are keyed by base name; file = id + extension.
+  return `${n.id}.${n.language === 'python' ? 'py' : 'sql'}`
+}
+
+// Bidirectional maps linking the editor's active file ↔ a lineage node.
+export const fileToLineage: Record<string, { project: string; nodeId: string }> = {}
+export const nodeToFile: Record<string, string> = {}
+for (const [project, g] of Object.entries(lineageByProject)) {
+  for (const n of g.nodes) {
+    const file = fileForNode(project, n)
+    if (!file) continue
+    fileToLineage[file] = { project, nodeId: n.id }
+    nodeToFile[`${project}:${n.id}`] = file
+  }
+}
 
 // ─── SESSION (Cortex AI) conversation ───
 

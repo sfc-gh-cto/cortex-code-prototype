@@ -8,16 +8,18 @@ function SectionHeader({
   open,
   onToggle,
   actions,
+  className = '',
 }: {
   label: string
   open: boolean
   onToggle: () => void
   actions?: React.ReactNode
+  className?: string
 }) {
   return (
     <div
       onClick={onToggle}
-      className="group flex h-[22px] cursor-pointer items-center gap-1 pl-1 pr-2 text-[11px] font-bold uppercase tracking-wide text-text"
+      className={`group flex h-[22px] cursor-pointer items-center gap-1 pl-1 pr-2 text-[11px] font-bold uppercase tracking-wide text-text ${className}`}
     >
       {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
       <span className="truncate">{label}</span>
@@ -66,8 +68,18 @@ export function ExplorerView({
 
       {/* Bottom collapsed sections */}
       <div className="shrink-0 border-t border-border">
-        <SectionHeader label="Outline" open={false} onToggle={() => {}} />
-        <SectionHeader label="Timeline" open={false} onToggle={() => {}} />
+        <SectionHeader
+          label="Outline"
+          open={false}
+          onToggle={() => {}}
+          className="border-b border-border"
+        />
+        <SectionHeader
+          label="Timeline"
+          open={false}
+          onToggle={() => {}}
+          className="border-b border-border"
+        />
       </div>
     </div>
   )

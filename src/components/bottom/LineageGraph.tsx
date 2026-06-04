@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Lock, Plus, Minus, Maximize2, Expand } from 'lucide-react'
-import { lineageNodes, lineageEdges, type LineageNode } from '../../data/mockData'
+import { Lock, Plus, Minus, Maximize2, Expand, Columns3 } from 'lucide-react'
+import { lineageByProject, nodeToFile, type LineageNode } from '../../data/mockData'
 
 const NODE_W = 168
 const NODE_H = 48
@@ -24,8 +24,20 @@ function Kbd({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function LineageGraph() {
-  const [selected, setSelected] = useState<string | null>('customer_loyalty_metrics')
+export function LineageGraph({
+  project,
+  selected,
+  onSelect,
+  onOpenFile,
+}: {
+  project: string
+  selected: string | null
+  onSelect: (nodeId: string) => void
+  onOpenFile: (name: string) => void
+}) {
+  const graph = lineageByProject[project] ?? lineageByProject.tasty_bytes_dbt_demo
+  const { nodes: lineageNodes, edges: lineageEdges } = graph
+  const [direction, setDirection] = useState<'upstream' | 'downstream'>('upstream')
 
   const nodeById = Object.fromEntries(lineageNodes.map((n) => [n.id, n]))
   const maxCol = Math.max(...lineageNodes.map((n) => n.col))
@@ -43,14 +55,47 @@ export function LineageGraph() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* selection helper bar */}
-      <div className="flex h-7 shrink-0 items-center gap-3 border-b border-border bg-chrome-bg px-3 text-[11px] text-text-muted">
+      {/* lineage header: selection hints (left) + lineage controls (right) */}
+      <div className="flex h-9 shrink-0 items-center gap-3 border-b border-border bg-chrome-bg px-3 text-[11px] text-text-muted">
         <span>{selected ? '1 selected' : 'No selection'}</span>
         <span className="flex items-center gap-1"><Kbd>⌘+Click</Kbd> Add/remove</span>
-        <span className="flex items-center gap-1"><Kbd>⌘+A</Kbd> Select all</span>
-        <span className="flex items-center gap-1"><Kbd>Shift+Drag</Kbd> Select</span>
         <span className="flex items-center gap-1"><Kbd>Esc</Kbd> Clear</span>
-        <Lock size={13} className="ml-auto hover:text-text" />
+
+        <div className="ml-auto flex items-center gap-3">
+          {/* upstream / downstream toggle */}
+          <div className="flex items-center overflow-hidden rounded border border-border-strong text-[12px]">
+            <button
+              onClick={() => setDirection('upstream')}
+              className={`px-2.5 py-1 ${
+                direction === 'upstream' ? 'bg-accent/80 text-white' : 'text-text-muted hover:text-text'
+              }`}
+            >
+              Upstream
+            </button>
+            <button
+              onClick={() => setDirection('downstream')}
+              className={`px-2.5 py-1 ${
+                direction === 'downstream' ? 'bg-accent/80 text-white' : 'text-text-muted hover:text-text'
+              }`}
+            >
+              Downstream
+            </button>
+          </div>
+          {/* depth */}
+          <div className="flex items-center gap-1.5 text-[12px] text-text-muted">
+            <span>Depth:</span>
+            <input
+              defaultValue={5}
+              className="h-6 w-10 rounded border border-border-strong bg-app-bg px-2 text-center text-text outline-none focus:border-accent"
+            />
+          </div>
+          {/* columns */}
+          <button className="flex h-6 items-center gap-1.5 rounded border border-border-strong px-2 text-[12px] text-text-muted hover:text-text">
+            <Columns3 size={13} />
+            Columns
+          </button>
+          <Lock size={13} className="hover:text-text" />
+        </div>
       </div>
 
       {/* canvas */}
@@ -107,7 +152,12 @@ export function LineageGraph() {
             return (
               <div
                 key={node.id}
-                onClick={() => setSelected(node.id)}
+                onClick={() => onSelect(node.id)}
+                onDoubleClick={() => {
+                  const file = nodeToFile[`${project}:${node.id}`]
+                  if (file) onOpenFile(file)
+                }}
+                title={nodeToFile[`${project}:${node.id}`] ? 'Double-click to open file' : undefined}
                 style={{ left: p.x, top: p.y, width: NODE_W, height: NODE_H }}
                 className={`absolute flex cursor-pointer items-center gap-2.5 rounded-md border bg-[#2b2b2b] px-2 ${
                   isSelected
