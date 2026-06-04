@@ -8,28 +8,18 @@ import { OutputToolbar } from './OutputToolbar'
 import { SqlResultsTab, type PreviewState } from './SqlResultsTab'
 import { SqlResultsToolbar, type SqlView } from './SqlResultsToolbar'
 import { DbtTab } from './DbtTab'
-import { DocsEditor } from './DocsEditor'
 import { LineageToolbar } from './LineageToolbar'
 import { PortsTab } from './PortsTab'
 import type { OutputLine } from '../../data/dbtOutput'
 
-export type BottomTab =
-  | 'problems'
-  | 'output'
-  | 'terminal'
-  | 'sql'
-  | 'dbt'
-  | 'docs-editor'
-  | 'ports'
+export type BottomTab = 'problems' | 'output' | 'terminal' | 'sql' | 'dbt' | 'ports'
 
-// `managed` tabs only appear in Snowflake Managed mode.
-const TABS: { id: BottomTab; label: string; managed?: boolean }[] = [
+const TABS: { id: BottomTab; label: string }[] = [
   { id: 'problems', label: 'Problems' },
   { id: 'output', label: 'Output' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'sql', label: 'SQL Results' },
   { id: 'dbt', label: 'Lineage' },
-  { id: 'docs-editor', label: 'Docs Editor', managed: true },
   { id: 'ports', label: 'Ports' },
 ]
 
@@ -51,7 +41,6 @@ export function BottomPanel({
   lineageNode,
   onLineageNodeChange,
   onOpenFile,
-  managed,
 }: {
   tab: BottomTab
   onTabChange: (tab: BottomTab) => void
@@ -70,7 +59,6 @@ export function BottomPanel({
   lineageNode: string | null
   onLineageNodeChange: (nodeId: string) => void
   onOpenFile: (name: string) => void
-  managed: boolean
 }) {
   // SQL Results view (Results / Query History): default to results once some exist.
   const [sqlView, setSqlView] = useState<SqlView>(preview ? 'results' : 'history')
@@ -78,33 +66,24 @@ export function BottomPanel({
     if (preview) setSqlView('results')
   }, [preview?.key])
 
-  const visibleTabs = TABS.filter((t) => !t.managed || managed)
-  // If the Docs Editor (managed-only) is active when leaving managed mode, show
-  // Lineage instead so the panel never renders a hidden tab.
-  const activeTab: BottomTab = tab === 'docs-editor' && !managed ? 'dbt' : tab
-
   const hasTabToolbar =
-    activeTab === 'terminal' ||
-    activeTab === 'output' ||
-    activeTab === 'sql' ||
-    activeTab === 'dbt' ||
-    activeTab === 'docs-editor'
+    tab === 'terminal' || tab === 'output' || tab === 'sql' || tab === 'dbt'
 
   return (
     <div className="flex h-full flex-col bg-app-bg">
       {/* tab strip */}
       <div className="flex h-9 shrink-0 items-center justify-between border-t border-border pl-2">
         <div className="flex items-stretch">
-          {visibleTabs.map((t) => (
+          {TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => onTabChange(t.id)}
               className={`relative px-3 text-[11px] font-medium uppercase tracking-wide ${
-                activeTab === t.id ? 'text-text-bright' : 'text-text-muted hover:text-text'
+                tab === t.id ? 'text-text-bright' : 'text-text-muted hover:text-text'
               }`}
             >
               {t.label}
-              {activeTab === t.id && (
+              {tab === t.id && (
                 <span className="absolute -bottom-px left-2 right-2 h-0.5 bg-accent" />
               )}
             </button>
@@ -112,16 +91,16 @@ export function BottomPanel({
         </div>
         <div className="flex items-center gap-1 pr-2 text-text-muted">
           {/* Per-tab toolbar (left of the divider) */}
-          {activeTab === 'terminal' && <TerminalToolbar />}
-          {activeTab === 'output' && (
+          {tab === 'terminal' && <TerminalToolbar />}
+          {tab === 'output' && (
             <OutputToolbar
               channel={outputChannel}
               onChannelChange={onOutputChannelChange}
               onClear={onClearOutput}
             />
           )}
-          {activeTab === 'sql' && <SqlResultsToolbar view={sqlView} onViewChange={setSqlView} />}
-          {(activeTab === 'dbt' || activeTab === 'docs-editor') && (
+          {tab === 'sql' && <SqlResultsToolbar view={sqlView} onViewChange={setSqlView} />}
+          {tab === 'dbt' && (
             <LineageToolbar project={lineageProject} onProjectChange={onLineageProjectChange} />
           )}
           {hasTabToolbar && <span className="mx-1 h-4 w-px bg-border" />}
@@ -142,15 +121,15 @@ export function BottomPanel({
 
       {/* content */}
       <div className="min-h-0 flex-1 overflow-hidden">
-        {activeTab === 'problems' && <ProblemsTab />}
-        {activeTab === 'output' && (
+        {tab === 'problems' && <ProblemsTab />}
+        {tab === 'output' && (
           <OutputTab channel={outputChannel} dbtOutput={dbtOutput} running={dbtRunning} />
         )}
-        {activeTab === 'terminal' && <TerminalTab />}
-        {activeTab === 'sql' && (
+        {tab === 'terminal' && <TerminalTab />}
+        {tab === 'sql' && (
           <SqlResultsTab view={sqlView} preview={preview} onOpenInEditor={onOpenResultsInEditor} />
         )}
-        {activeTab === 'dbt' && (
+        {tab === 'dbt' && (
           <DbtTab
             project={lineageProject}
             selected={lineageNode}
@@ -158,10 +137,7 @@ export function BottomPanel({
             onOpenFile={onOpenFile}
           />
         )}
-        {activeTab === 'docs-editor' && (
-          <DocsEditor key={`${lineageProject}:${lineageNode}`} project={lineageProject} selected={lineageNode} />
-        )}
-        {activeTab === 'ports' && <PortsTab />}
+        {tab === 'ports' && <PortsTab />}
       </div>
     </div>
   )

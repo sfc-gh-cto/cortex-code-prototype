@@ -21,8 +21,7 @@ const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min)
 const modelToken = (name: string) => name.replace(/\.(sql|py)$/, '')
 
 function dbtCommandFor(action: DbtAction, model: string): string {
-  const verb = action === 'compile' ? 'compile' : 'build'
-  return `dbt ${verb} --select ${modelToken(model)}`
+  return `dbt ${action} --select ${modelToken(model)}`
 }
 
 export function Shell() {
@@ -144,12 +143,24 @@ export function Shell() {
   // dbt execution mode (shared by the command bar + Settings UI)
   const [runMode, setRunMode] = useState<RunMode>('snowflake')
 
-  // editor split pane (right side) + which models have compiled artifacts
+  // editor split pane (right side): either compiled SQL or model docs (exclusive)
   const [splitFile, setSplitFile] = useState<string | null>(null)
+  const [splitDocs, setSplitDocs] = useState<string | null>(null)
   const [compiledModels, setCompiledModels] = useState<Set<string>>(new Set())
 
   function viewCompiled(model: string) {
+    setSplitDocs(null)
     setSplitFile(compiledPathFor(model))
+  }
+
+  function viewDocs(model: string) {
+    setSplitFile(null)
+    setSplitDocs(model)
+  }
+
+  function closeSplit() {
+    setSplitFile(null)
+    setSplitDocs(null)
   }
 
   // dbt Output channel
@@ -266,9 +277,10 @@ export function Shell() {
                 onRunDbt={runDbtFromEditor}
                 compiledModels={compiledModels}
                 onViewCompiled={viewCompiled}
+                onViewDocs={viewDocs}
                 splitFile={splitFile}
-                onCloseSplit={() => setSplitFile(null)}
-                onOpenSettings={() => openFile(SETTINGS_TAB)}
+                splitDocs={splitDocs}
+                onCloseSplit={closeSplit}
                 runMode={runMode}
                 onRunModeChange={setRunMode}
               />
@@ -304,7 +316,6 @@ export function Shell() {
                   lineageNode={lineageNode}
                   onLineageNodeChange={setLineageNode}
                   onOpenFile={openFile}
-                  managed={runMode === 'snowflake'}
                 />
               </div>
             </>
@@ -315,7 +326,7 @@ export function Shell() {
             command={command}
             onCommandChange={setCommand}
             running={dbtRunning}
-            onRun={() => runCommand(command)}
+            onRun={runCommand}
             onStop={stopDbt}
             onOpenSettings={() => openFile(SETTINGS_TAB)}
             runMode={runMode}
