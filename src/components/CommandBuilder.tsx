@@ -70,7 +70,9 @@ export function CommandBuilder({
     const r = anchorRef.current.getBoundingClientRect()
     setPos({
       bottom: window.innerHeight - r.top + 6,
-      left: Math.max(8, Math.min(r.right - WIDTH, window.innerWidth - WIDTH - 8)),
+      // Left-align to the input so the builder opens where the "Build command…"
+      // chip sits, not on the far right edge of the input.
+      left: Math.max(8, Math.min(r.left, window.innerWidth - WIDTH - 8)),
     })
   }, [open, anchorRef])
 

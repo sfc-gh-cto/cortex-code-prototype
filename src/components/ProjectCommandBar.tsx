@@ -1,12 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronUp, Play, Square, Snowflake, SlidersHorizontal, Laptop, Check } from 'lucide-react'
+import { ChevronUp, Play, Square, Snowflake, SlidersHorizontal, Laptop, Check, History } from 'lucide-react'
 import { CommandBuilder } from './CommandBuilder'
 import {
   ManagedCommandBar,
   ManagedRunButton,
   managedDbtCommand,
-  DEFAULT_MANAGED,
   type ManagedConfig,
 } from './ManagedCommandBar'
 import { EXECUTION_MODES, type RunMode } from '../data/settings'
@@ -207,39 +206,148 @@ function RunModeControl({
   )
 }
 
+// Recent-commands affordance: a clock button that opens a list of previously run
+// dbt commands above the bar; clicking one re-runs it.
+function RecentCommands({
+  commands,
+  onRun,
+}: {
+  commands: string[]
+  onRun: (cmd: string) => void
+}) {
+  const anchorRef = useRef<HTMLButtonElement>(null)
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ bottom: number; left: number; width: number } | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open || !anchorRef.current) return
+    const r = anchorRef.current.getBoundingClientRect()
+    const width = 360
+    setPos({
+      bottom: window.innerHeight - r.top + 6,
+      left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)),
+      width,
+    })
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (anchorRef.current?.contains(e.target as Node)) return
+      setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  if (!commands.length) return null
+
+  return (
+    <>
+      <button
+        ref={anchorRef}
+        onClick={() => setOpen((o) => !o)}
+        title="Recent commands"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border-strong bg-input-bg text-text-muted hover:border-text-muted hover:text-text"
+      >
+        <History size={13} />
+      </button>
+
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{ position: 'fixed', bottom: pos.bottom, left: pos.left, width: pos.width }}
+            className="z-[1000] overflow-hidden rounded-md border border-[#454545] bg-[#252526] py-1 shadow-2xl"
+          >
+            <div className="px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+              Recent Commands
+            </div>
+            {commands.map((cmd, i) => (
+              <button
+                key={`${cmd}-${i}`}
+                onClick={() => {
+                  onRun(cmd)
+                  setOpen(false)
+                }}
+                title={`Run: ${cmd}`}
+                className="group flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-hover-bg"
+              >
+                <History size={12} className="shrink-0 text-text-muted" />
+                <span className="truncate font-mono text-[12px] text-text-muted group-hover:text-text">
+                  {cmd}
+                </span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
+  )
+}
+
 // Project-centric command bar pinned to the bottom of the workbench. Hosts the
 // active project selector and a dbt command input (dbt today; dcm, etc. later).
 export function ProjectCommandBar({
   command,
   onCommandChange,
+  managedConfig,
+  onManagedConfigChange,
+  recentCommands,
+  onRunRecent,
+  flagHistory,
+  focusFlagsSignal,
   running,
   onRun,
   onStop,
   onOpenSettings,
   runMode,
   onRunModeChange,
+  project,
+  onProjectChange,
 }: {
   command: string
   onCommandChange: (value: string) => void
+  managedConfig: ManagedConfig
+  onManagedConfigChange: (config: ManagedConfig) => void
+  recentCommands: string[]
+  onRunRecent: (cmd: string) => void
+  flagHistory: string[]
+  focusFlagsSignal: number
   running: boolean
   onRun: (text: string) => void
   onStop: () => void
   onOpenSettings: () => void
   runMode: RunMode
   onRunModeChange: (mode: RunMode) => void
+  project: string
+  onProjectChange: (project: string) => void
 }) {
   const inputRef = useRef<HTMLDivElement>(null)
-  const [project, setProject] = useState(dbtProjectRoots[0] ?? 'tasty_bytes_dbt_demo')
+  const localInputRef = useRef<HTMLInputElement>(null)
   const [builderOpen, setBuilderOpen] = useState(false)
   // The "Build command…" chip shown while the input is focused (before typing).
   const [chipOpen, setChipOpen] = useState(false)
   const [chipPos, setChipPos] = useState<{ bottom: number; left: number } | null>(null)
 
-  // Snowflake Managed structured command state (operation + flags + run context).
-  const [managedConfig, setManagedConfig] = useState<ManagedConfig>(DEFAULT_MANAGED)
-
   const managed = runMode === 'snowflake'
   const commandToRun = managed ? managedDbtCommand(managedConfig) : command
+
+  // Local mode: focus the command input when the editor's "Run with flags…" stages
+  // a command. (In managed mode, ManagedCommandBar focuses its own flags input.)
+  useEffect(() => {
+    if (!focusFlagsSignal || managed) return
+    const el = localInputRef.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [focusFlagsSignal])
 
   useLayoutEffect(() => {
     if (!chipOpen || !inputRef.current) return
@@ -249,10 +357,15 @@ export function ProjectCommandBar({
 
   return (
     <div className="flex h-9 shrink-0 items-center gap-2 border-y border-border bg-chrome-bg px-2">
-      <ProjectSelector projects={dbtProjectRoots} value={project} onChange={setProject} />
+      <ProjectSelector projects={dbtProjectRoots} value={project} onChange={onProjectChange} />
 
       {managed ? (
-        <ManagedCommandBar project={project} value={managedConfig} onChange={setManagedConfig} />
+        <ManagedCommandBar
+          value={managedConfig}
+          onChange={onManagedConfigChange}
+          flagHistory={flagHistory}
+          focusSignal={focusFlagsSignal}
+        />
       ) : (
         /* Local mode: free-text dbt command input */
         <div
@@ -261,6 +374,7 @@ export function ProjectCommandBar({
         >
           <span className="shrink-0 font-mono text-text-muted">$</span>
           <input
+            ref={localInputRef}
             value={command}
             onChange={(e) => {
               onCommandChange(e.target.value)
@@ -287,8 +401,9 @@ export function ProjectCommandBar({
         </button>
       ) : managed ? (
         <ManagedRunButton
-          operation={managedConfig.operation}
-          onOperationChange={(op) => setManagedConfig({ ...managedConfig, operation: op })}
+          project={project}
+          config={managedConfig}
+          onOperationChange={(op) => onManagedConfigChange({ ...managedConfig, operation: op })}
           onRun={() => onRun(commandToRun)}
         />
       ) : (
@@ -330,6 +445,8 @@ export function ProjectCommandBar({
           onChange={onCommandChange}
         />
       )}
+
+      <RecentCommands commands={recentCommands} onRun={onRunRecent} />
 
       <RunModeControl mode={runMode} onChange={onRunModeChange} onOpenSettings={onOpenSettings} />
     </div>

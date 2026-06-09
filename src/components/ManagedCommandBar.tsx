@@ -282,13 +282,15 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void
 }
 
 export function ManagedCommandBar({
-  project,
   value,
   onChange,
+  flagHistory,
+  focusSignal,
 }: {
-  project: string
   value: ManagedConfig
   onChange: (c: ManagedConfig) => void
+  flagHistory: string[]
+  focusSignal: number
 }) {
   const set = <K extends keyof ManagedConfig>(key: K, v: ManagedConfig[K]) =>
     onChange({ ...value, [key]: v })
@@ -302,21 +304,37 @@ export function ManagedCommandBar({
   const advancedActive = value.integration !== '(None)' || value.version !== VERSIONS[0]
   const varsActive = value.varsEnabled && value.vars.some((v) => v.key.trim())
 
-  // The generated SQL is informational, surfaced as a hover/focus preview over
-  // the flags input rather than competing for space as its own pill.
-  const flagsRef = useRef<HTMLDivElement>(null)
-  const [sqlOpen, setSqlOpen] = useState(false)
-  const [sqlPos, setSqlPos] = useState<{ bottom: number; left: number } | null>(null)
-  const SQL_W = 440
+  // Focus + select the flags input when the editor's "Run with flags…" stages a
+  // command, so the user can immediately add flags.
+  const flagsInputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!focusSignal) return
+    const el = flagsInputRef.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [focusSignal])
 
-  useLayoutEffect(() => {
-    if (!sqlOpen || !flagsRef.current) return
-    const r = flagsRef.current.getBoundingClientRect()
-    setSqlPos({
-      bottom: window.innerHeight - r.top + 8,
-      left: Math.max(8, Math.min(r.left, window.innerWidth - SQL_W - 8)),
-    })
-  }, [sqlOpen, value])
+  // Shell-style history for the flags input: ↑ recalls older entries, ↓ moves back
+  // toward the in-progress draft. -1 means "not navigating" (showing the draft).
+  const [flagHistIdx, setFlagHistIdx] = useState(-1)
+  const flagDraft = useRef('')
+  const onFlagsKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowUp') {
+      if (!flagHistory.length) return
+      e.preventDefault()
+      if (flagHistIdx === -1) flagDraft.current = value.flags
+      const next = Math.min(flagHistIdx + 1, flagHistory.length - 1)
+      setFlagHistIdx(next)
+      set('flags', flagHistory[next])
+    } else if (e.key === 'ArrowDown') {
+      if (flagHistIdx === -1) return
+      e.preventDefault()
+      const next = flagHistIdx - 1
+      setFlagHistIdx(next)
+      set('flags', next < 0 ? flagDraft.current : flagHistory[next])
+    }
+  }
 
   return (
     <div className="flex h-6 min-w-0 flex-1 items-center gap-1.5">
@@ -406,17 +424,15 @@ export function ManagedCommandBar({
       </Pill>
 
       {/* Free-text flags (incl. model selection, e.g. --select orders) */}
-      <div
-        ref={flagsRef}
-        onMouseEnter={() => setSqlOpen(true)}
-        onMouseLeave={() => setSqlOpen(false)}
-        className="flex h-6 min-w-0 flex-1 items-center gap-1.5 rounded border border-border-strong bg-input-bg px-2 focus-within:border-accent"
-      >
+      <div className="flex h-6 min-w-0 flex-1 items-center gap-1.5 rounded border border-border-strong bg-input-bg px-2 focus-within:border-accent">
         <input
+          ref={flagsInputRef}
           value={value.flags}
-          onChange={(e) => set('flags', e.target.value)}
-          onFocus={() => setSqlOpen(true)}
-          onBlur={() => setSqlOpen(false)}
+          onChange={(e) => {
+            setFlagHistIdx(-1)
+            set('flags', e.target.value)
+          }}
+          onKeyDown={onFlagsKeyDown}
           placeholder="flags & selection, e.g. --select orders+ --full-refresh"
           className="min-w-0 flex-1 bg-transparent font-mono text-[12px] text-text outline-none placeholder:text-text-dim"
         />
@@ -444,43 +460,34 @@ export function ManagedCommandBar({
           </div>
         )}
       </Pill>
-
-      {/* Generated SQL preview — informational, shown on flags hover/focus */}
-      {sqlOpen &&
-        sqlPos &&
-        createPortal(
-          <div
-            style={{ position: 'fixed', bottom: sqlPos.bottom, left: sqlPos.left, width: SQL_W }}
-            className="pointer-events-none z-[2000] overflow-hidden rounded-md border border-[#454545] bg-[#252526] shadow-2xl"
-          >
-            <div className="border-b border-[#454545] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-              Snowflake will execute
-            </div>
-            <pre className="overflow-x-auto whitespace-pre px-3 py-2.5 font-mono text-[12px] leading-5 text-text">
-              {managedSql(project, value)}
-            </pre>
-          </div>,
-          document.body,
-        )}
     </div>
   )
 }
 
 // Split Run button: the primary part runs the selected operation; the chevron
 // opens an operation picker. Used in managed mode in place of a separate pill.
+// Hovering the button previews the SQL Snowflake will execute.
 export function ManagedRunButton({
-  operation,
+  project,
+  config,
   onOperationChange,
   onRun,
 }: {
-  operation: string
+  project: string
+  config: ManagedConfig
   onOperationChange: (op: string) => void
   onRun: () => void
 }) {
+  const operation = config.operation
   const ref = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ bottom: number; left: number } | null>(null)
   const WIDTH = 180
+
+  // SQL preview popover (on hover) — informational, anchored to the button.
+  const [sqlOpen, setSqlOpen] = useState(false)
+  const [sqlPos, setSqlPos] = useState<{ bottom: number; left: number } | null>(null)
+  const SQL_W = 440
 
   useLayoutEffect(() => {
     if (!open || !ref.current) return
@@ -490,6 +497,16 @@ export function ManagedRunButton({
       left: Math.max(8, Math.min(r.right - WIDTH, window.innerWidth - WIDTH - 8)),
     })
   }, [open])
+
+  useLayoutEffect(() => {
+    if (!sqlOpen || !ref.current) return
+    const r = ref.current.getBoundingClientRect()
+    setSqlPos({
+      bottom: window.innerHeight - r.top + 8,
+      // Right-align the wide preview to the button, clamped to the viewport.
+      left: Math.max(8, Math.min(r.right - SQL_W, window.innerWidth - SQL_W - 8)),
+    })
+  }, [sqlOpen, config, project])
 
   useEffect(() => {
     if (!open) return
@@ -511,6 +528,8 @@ export function ManagedRunButton({
     <div ref={ref} className="flex h-6 shrink-0 items-stretch overflow-hidden rounded">
       <button
         onClick={onRun}
+        onMouseEnter={() => setSqlOpen(true)}
+        onMouseLeave={() => setSqlOpen(false)}
         title="Run"
         className="flex items-center gap-1.5 bg-accent px-3 text-[12px] font-medium text-white hover:bg-accent-hover"
       >
@@ -549,6 +568,24 @@ export function ManagedRunButton({
                 </button>
               )
             })}
+          </div>,
+          document.body,
+        )}
+
+      {/* Generated SQL preview — informational, shown on Run button hover */}
+      {sqlOpen &&
+        sqlPos &&
+        createPortal(
+          <div
+            style={{ position: 'fixed', bottom: sqlPos.bottom, left: sqlPos.left, width: SQL_W }}
+            className="pointer-events-none z-[2000] overflow-hidden rounded-md border border-[#454545] bg-[#252526] shadow-2xl"
+          >
+            <div className="border-b border-[#454545] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+              Snowflake will execute
+            </div>
+            <pre className="overflow-x-auto whitespace-pre px-3 py-2.5 font-mono text-[12px] leading-5 text-text">
+              {managedSql(project, config)}
+            </pre>
           </div>,
           document.body,
         )}

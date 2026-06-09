@@ -3,7 +3,18 @@
 export type OutputTone = 'default' | 'muted' | 'success' | 'error' | 'warn'
 export type OutputLine = { ts?: string; text: string; tone?: OutputTone }
 
-export type DbtAction = 'build' | 'compile' | 'run'
+export type DbtAction =
+  | 'build'
+  | 'compile'
+  | 'run'
+  | 'test'
+  | 'seed'
+  | 'snapshot'
+  | 'deps'
+  | 'docs generate'
+  | 'retry'
+  | 'list'
+  | 'show'
 
 // Channels shown in the Output view dropdown. 'dbt' is first; '--' = separator.
 export const OUTPUT_CHANNELS: string[] = [
@@ -68,7 +79,67 @@ export function getDbtOutput(action: DbtAction, model?: string): OutputLine[] {
     return lines
   }
 
-  // build / run
+  if (action === 'deps') {
+    push(`Installing dbt_utils@1.1.1`)
+    push(`Installed from version 1.1.1`, 'success')
+    push(`Installing calogica/dbt_expectations@0.10.4`)
+    push(`Installed from version 0.10.4`, 'success')
+    blank()
+    push(`Done.`, 'success')
+    return lines
+  }
+
+  if (action === 'docs generate') {
+    push(`Building catalog`)
+    push(`Catalog written to target/catalog.json`, 'success')
+    blank()
+    push(`Completed successfully`, 'success')
+    blank()
+    push(`Done.`, 'success')
+    return lines
+  }
+
+  if (action === 'list') {
+    if (base) {
+      push(`tasty_bytes_dbt_demo.${base}`)
+    } else {
+      ;['raw_pos_country', 'raw_pos_menu', 'orders', 'customer_loyalty_metrics', 'sales_metrics_by_location'].forEach(
+        (m) => push(`tasty_bytes_dbt_demo.${m}`),
+      )
+    }
+    blank()
+    push(`Done.`, 'success')
+    return lines
+  }
+
+  if (action === 'show') {
+    push(`Previewing node '${base ?? 'orders'}':`)
+    blank()
+    push(`| order_id | customer_id | total_amount | order_date  |`, 'muted')
+    push(`| -------- | ----------- | ------------ | ----------- |`, 'muted')
+    push(`| 1001     | 42          | 128.50       | 2024-01-03  |`, 'muted')
+    push(`| 1002     | 17          | 64.00        | 2024-01-03  |`, 'muted')
+    push(`| 1003     | 88          | 212.75       | 2024-01-04  |`, 'muted')
+    blank()
+    push(`Done.`, 'success')
+    return lines
+  }
+
+  if (action === 'retry') {
+    push(`Retrying from previous run (target/run_results.json)`)
+    push(`1 of 1 START sql table model dbt_dev.${base ?? 'orders'}${dots(base ?? 'orders')}[RUN]`)
+    push(
+      `1 of 1 OK created sql table model dbt_dev.${base ?? 'orders'}${dots(base ?? 'orders')}[SUCCESS 1 in 1.04s]`,
+      'success',
+    )
+    blank()
+    push(`Completed successfully`, 'success')
+    blank()
+    push(`Done. PASS=1 WARN=0 ERROR=0 SKIP=0 TOTAL=1`, 'success')
+    return lines
+  }
+
+  // build / run / test / seed / snapshot — node-level execution output
   if (base) {
     push(`1 of 1 START sql table model dbt_dev.${base}${dots(base)}[RUN]`)
     push(`1 of 1 OK created sql table model dbt_dev.${base}${dots(base)}[SUCCESS 1 in 1.23s]`, 'success')

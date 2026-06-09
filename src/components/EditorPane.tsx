@@ -2,16 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import {
   X,
   ChevronRight,
+  ChevronDown,
   SplitSquareHorizontal,
   MoreHorizontal,
   Play,
-  Hammer,
-  Table,
-  Eye,
-  Code2,
   FileCode2,
   BookText,
   Settings,
+  SlidersHorizontal,
+  CheckCheck,
+  Boxes,
+  RotateCw,
+  List,
+  Eye,
+  type LucideIcon,
 } from 'lucide-react'
 import { tokenColors } from '../data/mockData'
 import {
@@ -26,24 +30,75 @@ import {
 import { FileIcon } from './FileIcon'
 import { Tooltip } from './ui/Tooltip'
 import { PortalMenu, type MenuEntry } from './ui/Menu'
+import { type DbtAction } from '../data/dbtOutput'
 import { ResultsTable } from './bottom/ResultsTable'
 import { ModelDocsPane } from './bottom/DocsEditor'
 import { SettingsPage } from './SettingsPage'
 import { isSettingsTab, type RunMode } from '../data/settings'
 
-// A table glyph with a small eye, signalling "preview the data".
-function DataPreviewIcon({ size = 15 }: { size?: number }) {
+type EditorAction = { key: string; label: string; icon: React.ReactNode; onClick: () => void }
+
+// dbt commands available for an individual model, in menu order.
+const MODEL_COMMANDS: { action: DbtAction; label: string; icon: LucideIcon }[] = [
+  { action: 'compile', label: 'Compile', icon: FileCode2 },
+  { action: 'run', label: 'Run', icon: Play },
+  { action: 'test', label: 'Test', icon: CheckCheck },
+  { action: 'build', label: 'Build', icon: Boxes },
+  { action: 'retry', label: 'Retry', icon: RotateCw },
+  { action: 'list', label: 'List', icon: List },
+  { action: 'show', label: 'Show', icon: Eye },
+]
+
+const modelTokenOf = (file: string) => file.replace(/\.(sql|py)$/, '')
+
+// Command button for the current model: opens a clean list of dbt commands and
+// runs the chosen one on this model. Flags are remembered per model (configured in
+// the dbt panel); when this model has saved flags, they're shown read-only here so
+// it's clear the run will include them.
+function RunCommandButton({
+  model,
+  onRun,
+  onStage,
+}: {
+  model: string
+  onRun: (action: DbtAction) => void
+  onStage: (action: DbtAction) => void
+}) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const [open, setOpen] = useState(false)
+  const items: MenuEntry[] = MODEL_COMMANDS.map(({ action, label, icon: Icon }) => ({
+    label: `${label} file`,
+    icon: <Icon size={14} />,
+    onClick: () => onRun(action),
+    secondaryAction: {
+      icon: <SlidersHorizontal size={13} />,
+      title: 'Run with flags…',
+      onClick: () => onStage(action),
+    },
+  }))
   return (
-    <span className="relative inline-flex">
-      <Table size={size} />
-      <span className="absolute -bottom-1.5 -right-1.5 flex items-center justify-center rounded-full bg-chrome-bg p-px text-text-muted group-hover:bg-hover-bg group-hover:text-text">
-        <Eye size={9} />
-      </span>
-    </span>
+    <>
+      <Tooltip label={`Run a dbt command on ${model}`}>
+        <button
+          ref={ref}
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-0.5 rounded p-1 hover:bg-hover-bg hover:text-text"
+        >
+          <Play size={15} />
+          <ChevronDown size={12} />
+        </button>
+      </Tooltip>
+      <PortalMenu
+        anchorRef={ref}
+        open={open}
+        onClose={() => setOpen(false)}
+        items={items}
+        width={230}
+        align="left"
+      />
+    </>
   )
 }
-
-type EditorAction = { key: string; label: string; icon: React.ReactNode; onClick: () => void }
 
 // File action icons with responsive overflow: at most 4 icons are shown, and
 // fewer as the pane narrows; the remainder collapse into a "More" dropdown.
@@ -152,8 +207,8 @@ export function EditorPane({
   activeFile,
   onSelectTab,
   onCloseTab,
-  onPreview,
   onRunDbt,
+  onStageDbt,
   compiledModels,
   onViewCompiled,
   onViewDocs,
@@ -168,7 +223,8 @@ export function EditorPane({
   onSelectTab: (name: string) => void
   onCloseTab: (name: string) => void
   onPreview: (name: string) => void
-  onRunDbt: (action: 'run' | 'build' | 'compile', name: string) => void
+  onRunDbt: (action: DbtAction, name: string) => void
+  onStageDbt: (action: DbtAction, name: string) => void
   compiledModels: Set<string>
   onViewCompiled: (name: string) => void
   onViewDocs: (name: string) => void
@@ -198,10 +254,6 @@ export function EditorPane({
 
   const dbtActions: EditorAction[] = showDbtActions
     ? [
-        { key: 'run', label: 'Run', icon: <Play size={15} />, onClick: () => onRunDbt('run', activeFile) },
-        { key: 'build', label: 'Build', icon: <Hammer size={15} />, onClick: () => onRunDbt('build', activeFile) },
-        { key: 'preview', label: 'Preview Data', icon: <DataPreviewIcon size={15} />, onClick: () => onPreview(activeFile) },
-        { key: 'compile', label: 'Compile', icon: <Code2 size={15} />, onClick: () => onRunDbt('compile', activeFile) },
         ...(showViewCompiled
           ? [{ key: 'compiled', label: 'View Compiled SQL', icon: <FileCode2 size={15} />, onClick: () => onViewCompiled(activeFile) }]
           : []),
@@ -252,6 +304,11 @@ export function EditorPane({
           <div className="flex items-center gap-1 pl-4 pr-3 text-text-muted">
             {showDbtActions && (
               <>
+                <RunCommandButton
+                  model={modelTokenOf(activeFile)}
+                  onRun={(action) => onRunDbt(action, activeFile)}
+                  onStage={(action) => onStageDbt(action, activeFile)}
+                />
                 <ToolbarActions actions={dbtActions} paneWidth={paneWidth} />
                 <span className="mx-1 h-4 w-px bg-border" />
               </>
