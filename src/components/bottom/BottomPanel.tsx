@@ -79,7 +79,7 @@ export function BottomPanel({
     <button
       key={t.id}
       onClick={() => onTabChange(t.id)}
-      className={`relative px-3 text-[11px] font-medium uppercase tracking-wide ${
+      className={`relative px-2.5 text-[11px] font-medium uppercase tracking-wide ${
         tab === t.id ? 'text-text-bright' : 'text-text-muted hover:text-text'
       }`}
     >
@@ -97,7 +97,7 @@ export function BottomPanel({
         <div className="flex items-stretch">
           {PERMANENT_TABS.map(renderTab)}
           {/* divider between permanent tabs and the dbt-project-scoped tabs */}
-          <span className="mx-1.5 h-4 w-px self-center bg-border" />
+          <span className="mx-2.5 h-4 w-px self-center bg-[#4e4e4e]" />
           {DBT_TABS.map(renderTab)}
         </div>
         <div className="flex items-center gap-1 pr-2 text-text-muted">
