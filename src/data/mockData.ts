@@ -501,6 +501,55 @@ export const lineageByProject: Record<string, LineageGraphData> = {
   },
 }
 
+// ─── DBT Performance (per-project model execution stats) ───
+// Mock run metrics for the Performance tab, derived from each project's lineage
+// model nodes so the tab stays in sync with the project selector.
+
+export type ModelPerformance = {
+  model: string
+  language: 'sql' | 'python'
+  status: 'success' | 'error'
+  rows: number
+  durationMs: number
+}
+
+export type ProjectPerformance = {
+  models: ModelPerformance[]
+  totalMs: number
+  invokedAt: string
+}
+
+// Deterministic pseudo-random from a string, so values are stable per model.
+function seededValue(seed: string, min: number, max: number): number {
+  let h = 2166136261
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  const unit = ((h >>> 0) % 1000) / 1000
+  return Math.round(min + unit * (max - min))
+}
+
+export const performanceByProject: Record<string, ProjectPerformance> = Object.fromEntries(
+  Object.entries(lineageByProject).map(([project, g]) => {
+    const models: ModelPerformance[] = g.nodes
+      .filter((n) => n.type === 'model')
+      .map((n) => {
+        const python = n.language === 'python'
+        return {
+          model: n.name,
+          language: (n.language ?? 'sql') as 'sql' | 'python',
+          status: 'success' as const,
+          rows: seededValue(`${project}:${n.id}:rows`, 120, 480_000),
+          // python models run heavier than plain SQL transforms
+          durationMs: seededValue(`${project}:${n.id}:ms`, python ? 4200 : 180, python ? 21000 : 6400),
+        }
+      })
+    const totalMs = models.reduce((sum, m) => sum + m.durationMs, 0)
+    return [project, { models, totalMs, invokedAt: '14:11:04' }]
+  }),
+)
+
 // jaffle node ids don't match their file base names, so map them explicitly.
 const jaffleNodeFiles: Record<string, string> = {
   stg_customers: 'jaffle_shop/models/staging/stg_customers.sql',

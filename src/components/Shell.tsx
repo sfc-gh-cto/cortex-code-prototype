@@ -79,10 +79,13 @@ export function Shell() {
   const [bottomTab, setBottomTab] = useState<BottomTab>('dbt')
   const [preview, setPreview] = useState<PreviewState | null>(null)
 
-  // Lineage tab state (project + selected node). Lifted here so it persists
-  // while the tab is hidden, and stays linked to the active editor file.
+  // Active dbt project — a single source of truth shared by the command bar's
+  // project selector AND the project-scoped Lineage/Performance tabs. Changing
+  // the project in the command bar updates those tabs.
   const firstProject = dbtProjectRoots[0] ?? 'tasty_bytes_dbt_demo'
-  const [lineageProject, setLineageProject] = useState(firstProject)
+  const [project, setProject] = useState(firstProject)
+  // Node selected within the Lineage graph. Lifted here so it persists while the
+  // tab is hidden, and stays linked to the active editor file.
   const [lineageNode, setLineageNode] = useState<string | null>(
     lineageByProject[firstProject]?.defaultSelected ?? null,
   )
@@ -97,22 +100,23 @@ export function Shell() {
     setSyncedFile(activeFile)
     const ref = fileToLineage[activeFile]
     if (ref) {
-      setLineageProject(ref.project)
+      setProject(ref.project)
       setLineageNode(ref.nodeId)
     } else {
       const proj = getFilePath(activeFile)[0]
-      if (dbtProjectRoots.includes(proj) && proj !== lineageProject) {
-        setLineageProject(proj)
+      if (dbtProjectRoots.includes(proj) && proj !== project) {
+        setProject(proj)
         setLineageNode(lineageByProject[proj]?.defaultSelected ?? null)
       }
     }
   }
 
-  // Manual project switch from the tab bar: keep the current node if it belongs
-  // to the new project, otherwise fall back to that project's default node.
-  function changeLineageProject(project: string) {
-    setLineageProject(project)
-    const graph = lineageByProject[project]
+  // Manual project switch from the command bar's project selector: keep the
+  // current node if it belongs to the new project, otherwise fall back to that
+  // project's default node.
+  function changeProject(next: string) {
+    setProject(next)
+    const graph = lineageByProject[next]
     const stillValid = lineageNode && graph?.nodes.some((n) => n.id === lineageNode)
     if (!stillValid) setLineageNode(graph?.defaultSelected ?? null)
   }
@@ -264,9 +268,6 @@ export function Shell() {
     })
   }
 
-  // Active dbt project (shared by the command bar).
-  const [project, setProject] = useState(dbtProjectRoots[0] ?? 'tasty_bytes_dbt_demo')
-
   // Run whatever is typed in the command bar (parse action + optional --select).
   function runCommand(text: string) {
     addRecent(text)
@@ -379,8 +380,7 @@ export function Shell() {
                   dbtOutput={dbtOutput}
                   dbtRunning={dbtRunning}
                   onClearOutput={() => setDbtOutput([])}
-                  lineageProject={lineageProject}
-                  onLineageProjectChange={changeLineageProject}
+                  project={project}
                   lineageNode={lineageNode}
                   onLineageNodeChange={setLineageNode}
                   onOpenFile={openFile}
@@ -406,7 +406,7 @@ export function Shell() {
             runMode={runMode}
             onRunModeChange={setRunMode}
             project={project}
-            onProjectChange={setProject}
+            onProjectChange={changeProject}
           />
         </div>
 
