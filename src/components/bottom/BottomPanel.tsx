@@ -8,19 +8,27 @@ import { OutputToolbar } from './OutputToolbar'
 import { SqlResultsTab, type PreviewState } from './SqlResultsTab'
 import { SqlResultsToolbar, type SqlView } from './SqlResultsToolbar'
 import { DbtTab } from './DbtTab'
-import { LineageToolbar } from './LineageToolbar'
+import { PerformanceTab } from './PerformanceTab'
 import { PortsTab } from './PortsTab'
 import type { OutputLine } from '../../data/dbtOutput'
 
-export type BottomTab = 'problems' | 'output' | 'terminal' | 'sql' | 'dbt' | 'ports'
+export type BottomTab = 'problems' | 'output' | 'terminal' | 'sql' | 'ports' | 'dbt' | 'performance'
 
-const TABS: { id: BottomTab; label: string }[] = [
+type TabDef = { id: BottomTab; label: string }
+
+// Always-present workbench tabs.
+const PERMANENT_TABS: TabDef[] = [
   { id: 'problems', label: 'Problems' },
   { id: 'output', label: 'Output' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'sql', label: 'SQL Results' },
-  { id: 'dbt', label: 'Lineage' },
   { id: 'ports', label: 'Ports' },
+]
+
+// dbt-project-scoped tabs — their content follows the active dbt project.
+const DBT_TABS: TabDef[] = [
+  { id: 'dbt', label: 'Lineage' },
+  { id: 'performance', label: 'Performance' },
 ]
 
 export function BottomPanel({
@@ -36,8 +44,7 @@ export function BottomPanel({
   dbtOutput,
   dbtRunning,
   onClearOutput,
-  lineageProject,
-  onLineageProjectChange,
+  project,
   lineageNode,
   onLineageNodeChange,
   onOpenFile,
@@ -54,8 +61,7 @@ export function BottomPanel({
   dbtOutput: OutputLine[]
   dbtRunning: boolean
   onClearOutput?: () => void
-  lineageProject: string
-  onLineageProjectChange: (project: string) => void
+  project: string
   lineageNode: string | null
   onLineageNodeChange: (nodeId: string) => void
   onOpenFile: (name: string) => void
@@ -67,27 +73,32 @@ export function BottomPanel({
   }, [preview?.key])
 
   const hasTabToolbar =
-    tab === 'terminal' || tab === 'output' || tab === 'sql' || tab === 'dbt'
+    tab === 'terminal' || tab === 'output' || tab === 'sql'
+
+  const renderTab = (t: TabDef) => (
+    <button
+      key={t.id}
+      onClick={() => onTabChange(t.id)}
+      className={`relative px-3 text-[11px] font-medium uppercase tracking-wide ${
+        tab === t.id ? 'text-text-bright' : 'text-text-muted hover:text-text'
+      }`}
+    >
+      {t.label}
+      {tab === t.id && (
+        <span className="absolute -bottom-px left-2 right-2 h-0.5 bg-accent" />
+      )}
+    </button>
+  )
 
   return (
     <div className="flex h-full flex-col bg-app-bg">
       {/* tab strip */}
       <div className="flex h-9 shrink-0 items-center justify-between border-t border-border pl-2">
         <div className="flex items-stretch">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => onTabChange(t.id)}
-              className={`relative px-3 text-[11px] font-medium uppercase tracking-wide ${
-                tab === t.id ? 'text-text-bright' : 'text-text-muted hover:text-text'
-              }`}
-            >
-              {t.label}
-              {tab === t.id && (
-                <span className="absolute -bottom-px left-2 right-2 h-0.5 bg-accent" />
-              )}
-            </button>
-          ))}
+          {PERMANENT_TABS.map(renderTab)}
+          {/* divider between permanent tabs and the dbt-project-scoped tabs */}
+          <span className="mx-1.5 h-4 w-px self-center bg-border" />
+          {DBT_TABS.map(renderTab)}
         </div>
         <div className="flex items-center gap-1 pr-2 text-text-muted">
           {/* Per-tab toolbar (left of the divider) */}
@@ -100,9 +111,6 @@ export function BottomPanel({
             />
           )}
           {tab === 'sql' && <SqlResultsToolbar view={sqlView} onViewChange={setSqlView} />}
-          {tab === 'dbt' && (
-            <LineageToolbar project={lineageProject} onProjectChange={onLineageProjectChange} />
-          )}
           {hasTabToolbar && <span className="mx-1 h-4 w-px bg-border" />}
 
           {/* Global panel actions (present on every tab) */}
@@ -131,12 +139,13 @@ export function BottomPanel({
         )}
         {tab === 'dbt' && (
           <DbtTab
-            project={lineageProject}
+            project={project}
             selected={lineageNode}
             onSelect={onLineageNodeChange}
             onOpenFile={onOpenFile}
           />
         )}
+        {tab === 'performance' && <PerformanceTab project={project} onOpenFile={onOpenFile} />}
         {tab === 'ports' && <PortsTab />}
       </div>
     </div>
