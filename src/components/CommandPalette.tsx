@@ -1,160 +1,178 @@
-import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Search } from 'lucide-react'
-import { recentFiles } from '../data/files'
-import { FileIcon } from './FileIcon'
-
-type Provider = { label: string; hint?: string; shortcut?: string; prefix?: string }
-
-const providers: Provider[] = [
-  { label: 'Go to File', prefix: '' },
-  { label: 'Show and Run Commands', hint: '>', shortcut: '⇧⌘P', prefix: '> ' },
-  { label: 'Search for Text', hint: '%', prefix: '% ' },
-  { label: 'Open Quick Chat', shortcut: '⌃⌘L' },
-  { label: 'Open Agentic Browser', shortcut: '⌥⌘B' },
-  { label: 'Go to Symbol in Editor', hint: '@', prefix: '@' },
-  { label: 'Run Task', hint: 'task', prefix: 'task ' },
-  { label: 'More', hint: '?', prefix: '?' },
-]
-
-const PREFIXES = ['>', '@', '%', '?', ':', 'task ']
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronLeft } from 'lucide-react'
+import { commands, type Command } from '../data/commands'
 
 export function CommandPalette({
-  label,
-  onOpenFile,
+  open,
+  onClose,
+  onRun,
+  defaultFlags = '',
 }: {
-  label: string
-  onOpenFile: (name: string) => void
+  open: boolean
+  onClose: () => void
+  onRun: (cmd: Command, flags?: string) => void
+  defaultFlags?: string
 }) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
+  const [query, setQuery] = useState('>')
+  const [index, setIndex] = useState(0)
+  // Two-step flow: once a flag-taking command is picked, collect additional flags.
+  const [pending, setPending] = useState<Command | null>(null)
+  const [flags, setFlags] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const flagsRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (panelRef.current?.contains(e.target as Node)) return
-      if (triggerRef.current?.contains(e.target as Node)) return
-      setOpen(false)
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
+    if (open) {
+      setQuery('>')
+      setIndex(0)
+      setPending(null)
+      setFlags('')
+      requestAnimationFrame(() => inputRef.current?.focus())
     }
   }, [open])
 
-  useEffect(() => {
-    if (open) inputRef.current?.focus()
-    else setQuery('')
-  }, [open])
+  const term = query.replace(/^>/, '').trim().toLowerCase()
+  const filtered = useMemo(
+    () => commands.filter((c) => `${c.category} ${c.title}`.toLowerCase().includes(term)),
+    [term],
+  )
 
-  const q = query.trim().toLowerCase()
-  const inCommandMode = PREFIXES.some((p) => q.startsWith(p.trim()) && p.trim() !== '')
-  const showProviders = q === '' || inCommandMode
-  const fileList =
-    q === ''
-      ? recentFiles
-      : inCommandMode
-        ? []
-        : recentFiles.filter((f) => f.name.toLowerCase().includes(q))
+  if (!open) return null
 
-  function pickProvider(p: Provider) {
-    setQuery(p.prefix ?? '')
-    inputRef.current?.focus()
+  const choose = (c: Command | undefined) => {
+    if (!c) return
+    if (c.takesFlags) {
+      // Step 2: open the secondary flags input, prefilled with the project defaults.
+      setPending(c)
+      setFlags(defaultFlags)
+      requestAnimationFrame(() => {
+        flagsRef.current?.focus()
+        flagsRef.current?.select()
+      })
+      return
+    }
+    onRun(c)
+    onClose()
   }
 
-  function pickFile(name: string) {
-    onOpenFile(name)
-    setOpen(false)
+  const runWithFlags = () => {
+    if (!pending) return
+    onRun(pending, flags.trim())
+    onClose()
+  }
+
+  const onListKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') onClose()
+    else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setIndex((i) => Math.min(i + 1, filtered.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setIndex((i) => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      choose(filtered[index])
+    }
+  }
+
+  const onFlagsKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      runWithFlags()
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      // Back to the command list.
+      setPending(null)
+      requestAnimationFrame(() => inputRef.current?.focus())
+    }
   }
 
   return (
-    <>
-      <button
-        ref={triggerRef}
-        onClick={() => setOpen((o) => !o)}
-        className="flex h-6 w-[460px] max-w-[50%] items-center justify-center gap-2 rounded-md border border-border-strong bg-app-bg/60 px-3 text-text-muted hover:bg-app-bg"
+    <div className="fixed inset-0 z-[1000] flex justify-center" onMouseDown={onClose}>
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{ marginTop: 8 }}
+        className="h-fit w-[600px] max-w-[90vw] overflow-hidden rounded-md border border-border-contrast bg-quickinput shadow-2xl"
       >
-        <Search size={11} />
-        <span className="truncate text-[12px] text-text">{label}</span>
-      </button>
-
-      {open &&
-        createPortal(
-          <div
-            ref={panelRef}
-            style={{ position: 'fixed', top: 32, left: '50%', transform: 'translateX(-50%)', width: 600 }}
-            className="z-[1000] overflow-hidden rounded-md border border-[#454545] bg-[#252526] shadow-2xl"
-          >
-            {/* search input */}
-            <div className="p-2">
+        {pending ? (
+          // Step 2 — secondary input for additional flags.
+          <>
+            <div className="flex items-center gap-1 px-2 pt-2 text-[12px] text-fg-muted">
+              <button
+                onClick={() => {
+                  setPending(null)
+                  requestAnimationFrame(() => inputRef.current?.focus())
+                }}
+                className="flex items-center rounded px-0.5 text-fg-muted hover:text-fg"
+                title="Back"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <span className="text-fg-muted">{pending.category}:</span>
+              <span className="text-fg">{pending.title}</span>
+            </div>
+            <div className="p-1">
+              <input
+                ref={flagsRef}
+                value={flags}
+                onChange={(e) => setFlags(e.target.value)}
+                onKeyDown={onFlagsKeyDown}
+                className="h-7 w-full rounded-sm border border-focus bg-input px-2 font-mono text-[13px] text-fg outline-none"
+                placeholder="Additional flags, e.g. --full-refresh --select orders+"
+              />
+            </div>
+            <div className="flex items-center justify-between px-3 pb-2 text-[11.5px] text-fg-dim">
+              <span>Press Enter to run on Snowflake Managed · Esc to go back</span>
+            </div>
+          </>
+        ) : (
+          // Step 1 — command list.
+          <>
+            <div className="p-1">
               <input
                 ref={inputRef}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search files by name (append : to go to line or @ to go to symbol)"
-                className="h-7 w-full rounded border border-focus bg-input-bg px-2 text-[13px] text-text outline-none placeholder:text-text-dim"
+                onChange={(e) => {
+                  setQuery(e.target.value)
+                  setIndex(0)
+                }}
+                onKeyDown={onListKeyDown}
+                className="h-7 w-full rounded-sm border border-focus bg-input px-2 text-[13px] text-fg outline-none"
+                placeholder="Type the name of a command to run"
               />
             </div>
-
-            <div className="max-h-[420px] overflow-y-auto pb-1">
-              {showProviders &&
-                providers.map((p) => (
+            <div className="max-h-[360px] overflow-y-auto pb-1">
+              {filtered.length === 0 ? (
+                <div className="px-3 py-2 text-[13px] text-fg-dim">No matching commands</div>
+              ) : (
+                filtered.map((c, i) => (
                   <button
-                    key={p.label}
-                    onClick={() => pickProvider(p)}
-                    className="group/row flex w-full items-center gap-2 px-3 py-[5px] text-left text-[13px] text-text hover:bg-accent hover:text-white"
+                    key={c.id}
+                    onMouseEnter={() => setIndex(i)}
+                    onClick={() => choose(c)}
+                    className={`flex w-full items-center gap-2 px-3 py-1 text-left text-[13px] ${
+                      i === index ? 'bg-list-active text-fg-bright' : 'text-fg hover:bg-hover'
+                    }`}
                   >
-                    <span className="flex-1 truncate">{p.label}</span>
-                    {p.hint && (
-                      <span className="rounded bg-input-bg px-1 text-[11px] text-text-muted group-hover/row:bg-white/20 group-hover/row:text-white">
-                        {p.hint}
+                    <span className="text-fg-muted">{c.category}:</span>
+                    <span className="flex-1 truncate">{c.title}</span>
+                    {c.takesFlags && (
+                      <span className="shrink-0 rounded bg-black/30 px-1 text-[10px] text-fg-dim">
+                        flags
                       </span>
                     )}
-                    {p.shortcut && (
-                      <span className="text-[11px] text-text-muted group-hover/row:text-white/80">{p.shortcut}</span>
+                    {c.keybinding && (
+                      <span className="shrink-0 font-mono text-[11px] text-fg-muted">
+                        {c.keybinding}
+                      </span>
                     )}
                   </button>
-                ))}
-
-              {fileList.length > 0 && (
-                <>
-                  {showProviders && <div className="my-1 border-t border-[#454545]" />}
-                  {fileList.map((f, i) => (
-                    <button
-                      key={f.name}
-                      onClick={() => pickFile(f.name)}
-                      className="group/row flex w-full items-center gap-2 px-3 py-[5px] text-left hover:bg-accent hover:text-white"
-                    >
-                      <FileIcon kind={f.kind} />
-                      <span className="shrink-0 text-[13px] text-text group-hover/row:text-white">{f.name}</span>
-                      <span className="flex-1 truncate text-[11px] text-text-dim group-hover/row:text-white/70">
-                        {f.dir}
-                      </span>
-                      {q === '' && i === 0 && (
-                        <span className="shrink-0 text-[11px] text-text-dim group-hover/row:text-white/70">
-                          recently opened
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </>
-              )}
-
-              {!showProviders && fileList.length === 0 && (
-                <div className="px-3 py-4 text-center text-[13px] text-text-dim">No matching files</div>
+                ))
               )}
             </div>
-          </div>,
-          document.body,
+          </>
         )}
-    </>
+      </div>
+    </div>
   )
 }

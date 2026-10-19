@@ -1,101 +1,88 @@
-import {
-  ChevronDown,
-  RefreshCw,
-  PanelLeft,
-  PanelBottom,
-  PanelRight,
-  LayoutGrid,
-} from 'lucide-react'
-import { CommandPalette } from './CommandPalette'
+import { Search, PanelLeft, PanelBottom, PanelRight, LayoutGrid } from 'lucide-react'
 
-function TrafficLights() {
-  return (
-    <div className="flex items-center gap-2 pl-1">
-      <span className="h-3 w-3 rounded-full bg-[#ff5f57]" />
-      <span className="h-3 w-3 rounded-full bg-[#febc2e]" />
-      <span className="h-3 w-3 rounded-full bg-[#28c840]" />
-    </div>
-  )
+const MENUS = ['File', 'Edit', 'Selection', 'View', 'Go', 'Run', 'Terminal', 'Window', 'Help']
+
+function TrafficLight({ color }: { color: string }) {
+  return <span className="h-3 w-3 rounded-full" style={{ background: color }} />
 }
 
-function SnowflakeMark() {
+function LayoutButton({
+  children,
+  active,
+  title,
+  onClick,
+}: {
+  children: React.ReactNode
+  active?: boolean
+  title: string
+  onClick?: () => void
+}) {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" className="text-[#29b5e8]">
-      <g stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-        <path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1" />
-      </g>
-    </svg>
+    <button
+      title={title}
+      onClick={onClick}
+      className={`flex h-6 w-7 items-center justify-center rounded hover:bg-white/10 ${
+        active ? 'text-fg-bright' : 'text-icon'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
 
 export function TitleBar({
   sidebarOpen,
-  bottomOpen,
-  sessionOpen,
+  panelOpen,
   onToggleSidebar,
-  onToggleBottom,
-  onToggleSession,
-  onOpenFile,
+  onTogglePanel,
+  onOpenPalette,
 }: {
   sidebarOpen: boolean
-  bottomOpen: boolean
-  sessionOpen: boolean
+  panelOpen: boolean
   onToggleSidebar: () => void
-  onToggleBottom: () => void
-  onToggleSession: () => void
-  onOpenFile: (name: string) => void
+  onTogglePanel: () => void
+  onOpenPalette: () => void
 }) {
   return (
-    <div className="flex h-9 shrink-0 items-center justify-between bg-chrome-bg px-3 text-xs select-none">
-      {/* left cluster */}
-      <div className="flex items-center gap-3" style={{ minWidth: 280 }}>
-        <TrafficLights />
-        <button className="ml-1 flex items-center gap-1.5 rounded px-1.5 py-0.5 text-text hover:bg-hover-bg">
-          <SnowflakeMark />
-          <span className="font-medium">qa6</span>
-          <ChevronDown size={12} className="text-text-muted" />
-        </button>
-        <button className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-text-muted hover:bg-hover-bg hover:text-text">
-          <RefreshCw size={11} />
-          <span>Update Now</span>
-        </button>
+    <div className="relative flex h-[35px] shrink-0 items-center bg-titlebar pr-2 pl-3 text-[13px] text-fg select-none">
+      {/* macOS traffic lights + menu bar */}
+      <div className="flex items-center">
+        <div className="flex items-center gap-2 pr-3">
+          <TrafficLight color="#ff5f57" />
+          <TrafficLight color="#febc2e" />
+          <TrafficLight color="#28c840" />
+        </div>
+        {MENUS.map((m) => (
+          <button key={m} className="rounded px-2 py-0.5 text-[13px] text-fg hover:bg-white/10">
+            {m}
+          </button>
+        ))}
       </div>
 
-      {/* center command bar */}
-      <div className="flex flex-1 justify-center">
-        <CommandPalette label="getting-started-with-dbt-on-snowflake" onOpenFile={onOpenFile} />
-      </div>
+      {/* Command center — absolutely centered, the way VS Code lays it out */}
+      <button
+        onClick={onOpenPalette}
+        className="absolute top-1/2 left-1/2 flex h-[22px] w-[min(460px,34vw)] -translate-x-1/2 -translate-y-1/2 items-center rounded border border-white/10 bg-white/[0.06] px-2 text-[12px] text-fg hover:bg-white/10"
+      >
+        <Search size={14} className="shrink-0 text-fg-muted" />
+        <span className="flex-1 text-center">tasty_bytes</span>
+        <span className="w-3.5 shrink-0" />
+      </button>
 
-      {/* right cluster */}
-      <div className="flex items-center justify-end gap-2" style={{ minWidth: 280 }}>
-        <div className="flex items-center gap-1 text-text-muted">
-          <button className="rounded p-1 hover:bg-hover-bg hover:text-text"><LayoutGrid size={14} /></button>
-          <button
-            onClick={onToggleSidebar}
-            title="Toggle Primary Side Bar"
-            className={`rounded p-1 hover:bg-hover-bg hover:text-text ${sidebarOpen ? 'text-text' : ''}`}
-          >
-            <PanelLeft size={14} />
-          </button>
-          <button
-            onClick={onToggleBottom}
-            title="Toggle Panel"
-            className={`rounded p-1 hover:bg-hover-bg hover:text-text ${bottomOpen ? 'text-text' : ''}`}
-          >
-            <PanelBottom size={14} />
-          </button>
-          <button
-            onClick={onToggleSession}
-            title="Toggle Session"
-            className={`rounded p-1 hover:bg-hover-bg hover:text-text ${sessionOpen ? 'text-text' : ''}`}
-          >
-            <PanelRight size={14} />
-          </button>
-        </div>
-        <div className="flex items-center rounded-md bg-input-bg p-0.5 text-[11px]">
-          <button className="rounded px-2 py-0.5 text-text-muted hover:text-text">Agent</button>
-          <button className="rounded bg-app-bg px-2 py-0.5 text-text shadow-sm">Editor</button>
-        </div>
+      {/* Layout controls */}
+      <div className="ml-auto flex items-center gap-0.5">
+        <LayoutButton title="Toggle Primary Side Bar" active={sidebarOpen} onClick={onToggleSidebar}>
+          <PanelLeft size={16} />
+        </LayoutButton>
+        <LayoutButton title="Toggle Panel" active={panelOpen} onClick={onTogglePanel}>
+          <PanelBottom size={16} />
+        </LayoutButton>
+        <LayoutButton title="Toggle Secondary Side Bar">
+          <PanelRight size={16} />
+        </LayoutButton>
+        <LayoutButton title="Customize Layout">
+          <LayoutGrid size={16} />
+        </LayoutButton>
       </div>
     </div>
   )

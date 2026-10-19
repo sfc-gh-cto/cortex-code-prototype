@@ -1,86 +1,71 @@
-import {
-  Files,
-  Search,
-  GitBranch,
-  Database,
-  Globe,
-  Box,
-  Play,
-  Bug,
-  History,
-  Settings,
-  User,
-} from 'lucide-react'
-import type { ComponentType } from 'react'
+import { Files, Search, GitBranch, Bug, Blocks, CircleUser, Settings, type LucideIcon } from 'lucide-react'
+import { DbtLogo } from './icons'
 
-export type SidebarView = 'explorer' | 'search' | 'scm' | 'catalog'
+export type ViewId = 'explorer' | 'search' | 'scm' | 'debug' | 'extensions' | 'dbt'
 
 type Item = {
-  id: SidebarView | string
-  icon: ComponentType<{ size?: number | string }>
+  id: ViewId
+  title: string
+  icon?: LucideIcon
+  render?: () => React.ReactNode
   badge?: string
-  switchable?: boolean
 }
 
-const topItems: Item[] = [
-  { id: 'explorer', icon: Files, switchable: true },
-  { id: 'search', icon: Search, switchable: true },
-  { id: 'scm', icon: GitBranch, badge: '1', switchable: true },
-  { id: 'catalog', icon: Database, switchable: true },
-  { id: 'globe', icon: Globe },
-  { id: 'run', icon: Play },
-  { id: 'debug', icon: Bug },
-  { id: 'extensions', icon: Box },
-  { id: 'history', icon: History },
-]
-
-const bottomItems: Item[] = [
-  { id: 'account', icon: User },
-  { id: 'settings', icon: Settings },
+const TOP: Item[] = [
+  { id: 'explorer', title: 'Explorer', icon: Files },
+  { id: 'search', title: 'Search', icon: Search },
+  { id: 'scm', title: 'Source Control', icon: GitBranch, badge: '3' },
+  { id: 'debug', title: 'Run and Debug', icon: Bug },
+  { id: 'extensions', title: 'Extensions', icon: Blocks },
+  { id: 'dbt', title: 'dbt', render: () => <DbtLogo size={24} /> },
 ]
 
 export function ActivityBar({
   active,
-  onSelect,
+  onChange,
 }: {
-  active: SidebarView | null
-  onSelect: (v: SidebarView) => void
+  active: ViewId
+  onChange: (id: ViewId) => void
 }) {
   return (
-    <div className="flex w-12 shrink-0 flex-col items-center justify-between border-r border-border bg-chrome-bg py-1">
+    <div className="flex h-full w-12 shrink-0 flex-col items-center justify-between bg-activitybar">
       <div className="flex flex-col items-center">
-        {topItems.map(({ id, icon: Icon, badge, switchable }) => {
-          const isActive = switchable && id === active
+        {TOP.map((item) => {
+          const isActive = active === item.id
           return (
             <button
-              key={id}
-              onClick={() => switchable && onSelect(id as SidebarView)}
+              key={item.id}
+              title={item.title}
+              onClick={() => onChange(item.id)}
               className={`relative flex h-12 w-12 items-center justify-center ${
-                isActive ? 'text-text-bright' : 'text-text-muted hover:text-text'
+                isActive ? 'text-fg-bright' : 'text-[#858585] hover:text-fg-bright'
               }`}
             >
-              {isActive && (
-                <span className="absolute left-0 top-1/2 h-6 w-0.5 -translate-y-1/2 bg-text-bright" />
-              )}
-              <Icon size={22} />
-              {badge && (
-                <span className="absolute bottom-2 right-2 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-semibold text-white">
-                  {badge}
+              {isActive && <span className="absolute top-0 left-0 h-full w-[2px] bg-fg-bright" />}
+              {item.render ? item.render() : item.icon && <item.icon size={24} strokeWidth={1.5} />}
+              {item.badge && (
+                <span className="absolute bottom-2 right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-semibold text-white">
+                  {item.badge}
                 </span>
               )}
             </button>
           )
         })}
       </div>
+
       <div className="flex flex-col items-center">
-        {bottomItems.map(({ id, icon: Icon }) => (
-          <button
-            key={id}
-            className="flex h-12 w-12 items-center justify-center text-text-muted hover:text-text"
-          >
-            <Icon size={22} />
-          </button>
-        ))}
+        <button
+          title="Accounts"
+          className="flex h-12 w-12 items-center justify-center text-[#858585] hover:text-fg-bright"
+        >
+          <CircleUser size={24} strokeWidth={1.5} />
+        </button>
+        <button
+          title="Manage"
+          className="flex h-12 w-12 items-center justify-center text-[#858585] hover:text-fg-bright"
+        >
+          <Settings size={24} strokeWidth={1.5} />
+        </button>
       </div>
     </div>
   )
