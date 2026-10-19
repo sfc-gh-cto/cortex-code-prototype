@@ -1,77 +1,43 @@
 @import 'tailwindcss';
 
-/* ─── Visual Studio Code — Dark+ (default dark) theme tokens ───
-   Values mirror VS Code's built-in Dark+ color theme so the mock reads as
-   stock VS Code with our extension living inside it. */
+/* ─── Cortex Code Dark theme (code-oss / VS Code Dark Modern based) ─── */
 @theme {
-  /* Surfaces */
-  --color-titlebar: #3c3c3c;
-  --color-activitybar: #333333;
-  --color-sidebar: #252526;
-  --color-sidebar-section: #252526;
-  --color-editor: #1e1e1e;
-  --color-tabs-bar: #252526;
-  --color-tab-active: #1e1e1e;
-  --color-tab-inactive: #2d2d2d;
-  --color-panel: #1e1e1e;
-  /* Current VS Code (Dark Modern) keeps the status bar dark. The full-width
-     blue bar was only the older Dark+ theme. */
-  --color-statusbar: #181818;
-  --color-statusbar-no-folder: #1f1f1f;
-  --color-input: #3c3c3c;
-  --color-dropdown: #3c3c3c;
-  --color-widget: #252526;
-  --color-quickinput: #252526;
+  --color-app-bg: #1f1f1f;
+  --color-editor-bg: #1f1f1f;
+  --color-chrome-bg: #181818;
+  --color-panel-bg: #181818;
+  --color-input-bg: #313131;
+  --color-hover-bg: #2a2d2e;
+  --color-active-bg: #04395e;
+  --color-active-list: #37373d;
 
-  /* Lists */
-  --color-hover: #2a2d2e;
-  --color-list-active: #094771;
-  --color-list-inactive: #37373d;
-  --color-list-focus-outline: #007fd4;
-
-  /* Borders */
   --color-border: #2b2b2b;
-  --color-border-contrast: #474747;
-  --color-panel-border: #2b2b2b;
-  --color-tab-border: #252526;
+  --color-border-strong: #313131;
 
-  /* Text */
-  --color-fg: #cccccc;
-  --color-fg-bright: #ffffff;
-  --color-fg-muted: #9d9d9d;
-  --color-fg-dim: #808080;
-  --color-icon: #c5c5c5;
-  --color-badge-bg: #4d4d4d;
+  --color-text: #cccccc;
+  --color-text-bright: #ffffff;
+  --color-text-muted: #9d9d9d;
+  --color-text-dim: #6e7681;
 
-  /* Accents */
-  --color-accent: #007acc;
-  --color-focus: #007fd4;
-  --color-button: #0e639c;
-  --color-button-hover: #1177bb;
-  --color-link: #3794ff;
+  --color-accent: #0078d4;
+  --color-accent-hover: #026ec1;
+  --color-link: #4daafc;
+  --color-focus: #0078d4;
 
-  /* Diagnostics */
-  --color-error: #f14c4c;
+  --color-success: #3fb950;
   --color-warn: #cca700;
-  --color-info: #3794ff;
-  --color-success: #89d185;
+  --color-error: #f14c4c;
   --color-modified: #e2c08d;
-  --color-added: #81b88b;
 
-  /* Snowflake brand (for extension accents) */
-  --color-snowflake: #29b5e8;
-
-  /* Syntax — Dark+ */
-  --color-sx-keyword: #569cd6;
-  --color-sx-string: #ce9178;
-  --color-sx-number: #b5cea8;
-  --color-sx-comment: #6a9955;
-  --color-sx-function: #dcdcaa;
-  --color-sx-type: #4ec9b0;
-  --color-sx-variable: #9cdcfe;
-  --color-sx-operator: #d4d4d4;
-  --color-sx-jinja: #c586c0;
-  --color-sx-text: #d4d4d4;
+  /* syntax */
+  --color-syntax-key: #9cdcfe;
+  --color-syntax-string: #ce9178;
+  --color-syntax-keyword: #569cd6;
+  --color-syntax-bool: #569cd6;
+  --color-syntax-comment: #6a9955;
+  --color-syntax-punct: #cccccc;
+  --color-syntax-number: #b5cea8;
+  --color-syntax-text: #cccccc;
 
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'SF Mono', Menlo, Monaco, 'Cascadia Code', 'Consolas', monospace;
@@ -85,26 +51,26 @@ body,
 }
 
 body {
-  background-color: var(--color-editor);
-  color: var(--color-fg);
+  background-color: var(--color-app-bg);
+  color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: 13px;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
 
 /* Thin VS Code-style scrollbars */
 ::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-thumb {
   background-color: rgba(121, 121, 121, 0.4);
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: content-box;
+  border-radius: 6px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(100, 100, 100, 0.7);
+  background-color: rgba(150, 150, 150, 0.6);
 }
 ::-webkit-scrollbar-corner {
   background: transparent;
